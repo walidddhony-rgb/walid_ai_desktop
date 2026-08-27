@@ -1,292 +1,303 @@
-"""Agent, Stream, Search, and Learn workers (QThread-based)."""
-from __future__ import annotations
-import json, re, sqlite3, traceback
-from datetime import datetime
-from typing import Optional
-
+import json
+import re
+import traceback
 import requests
 from PyQt6.QtCore import QThread, pyqtSignal
 
-from core.config import (
-    DEFAULT_MODEL, MODE_PROMPTS, NUM_CTX, OLLAMA_URL,
-    OLLAMA_RETRY_COUNT, OLLAMA_TIMEOUT, MAX_AGENT_ITERATIONS,
-)
-from core.utils import truncate
-from search.engine import SearchEngine
-from tools.registry import AGENT_TOOLS, execute_tool
-from agent.prompts import SYSTEM_PROMPT_AGENT, SYSTEM_PROMPT_CHAT
+from core.config import DEFAULT_MODEL, MODE_PROMPTS, NUM_CTX, OLLAMA_URL, TOP_K_RAG, DB_PATH
+from tools.registry import AGENT_TOOLS, execute_tool, set_exec_callback
+from db.embeddings import retrieve_relevant_chunks
+from db.database import Database
+from core.agents_md import read_agents_md
+from core.skills import discover_skills, format_skills_index
+
+BANNED_FACTS = {
+    "python", "shell", "javascript", "code", "use os", "count files",
+    "project evaluation", "code review", "bug checking", "facts",
+    "summary", "حقائق قصيرة", "متابعة", "النص بالعربية", "عدد الحقائق",
+    "yes continue", "following", "okay continue", "yes", "no",
+    "continue", "proceed", "file", "files", "directory",
+}
+
+BANNED_PREFIXES = [
+    "the user wants", "user wants", "user plans",
+    "the script will", "script will", "this script will",
+    "this script", "the user is", "user is",
+    "the code will", "code will",
+    "the agent will", "agent will",
+    "this folder", "this directory",
+    "the folder", "the directory",
+    "this file", "the file",
+    "there are", "there is",
+    "the user asked", "user asked",
+    "the workspace", "the project",
+    "a script", "the script",
+    "a python", "the python",
+    "this code", "the code",
+    "this message", "the message",
+    "the user is working", "user is working",
+    "this indicates", "the message indicates",
+    "this user", "the user has",
+    "the user's", "user's",
+]
+
+MAX_LOOPS = 15
 
 
 class AgentWorker(QThread):
-    """Streaming agent loop with Ollama tool calling.
-
-    Pattern:
-    1. Stream model response (content + tool_calls accumulated)
-    2. If tool_calls found, execute them locally
-    3. Feed results back to model
-    4. Repeat until no tool_calls or max iterations
-    5. Stream final content to UI
-    """
     chunk = pyqtSignal(str)
-    tool_action = pyqtSignal(str)
-    confirm_tool = pyqtSignal(str, str)
+    tool_action = pyqtSignal(str, str)
+    code_execution = pyqtSignal(str, str)
+    step_started = pyqtSignal(int)
+    learned_fact = pyqtSignal(str)
     finished_signal = pyqtSignal(int)
+    cancelled = pyqtSignal(str)
     error = pyqtSignal(str)
 
-    def __init__(self, msg: str, selected_modes: list, memory_text: str,
-                 files: list = None, regenerate: bool = False):
+    def __init__(self, msg, selected_modes, memory_text, files=None, cid="", auto_learn=True, workspace_path="", exec_callback=None):
         super().__init__()
         self.msg = msg
         self.selected_modes = selected_modes
         self.memory_text = memory_text
         self.files = files or []
-        self.regenerate = regenerate
+        self.cid = cid
+        self.auto_learn = auto_learn
+        self.workspace_path = workspace_path
         self._stop = False
-        self._local_db = None
+        self._prev_code = ""
+        if exec_callback:
+            set_exec_callback(exec_callback)
 
     def stop(self):
         self._stop = True
 
-    def _get_db(self) -> sqlite3.Connection:
-        from core.config import DB_PATH
-        if self._local_db is None:
-            self._local_db = sqlite3.connect(DB_PATH)
-            self._local_db.row_factory = sqlite3.Row
-        return self._local_db
-
     def run(self):
         try:
-            messages = self._build_messages()
-            for iteration in range(MAX_AGENT_ITERATIONS):
+            conversation = self._build_initial_messages()
+            for step in range(1, MAX_LOOPS + 1):
                 if self._stop:
-                    self.finished_signal.emit(1)
+                    self.cancelled.emit("تم إلغاء الرد الجاري.")
                     return
-                self.tool_action.emit(f"● خطوة {iteration+1}/{MAX_AGENT_ITERATIONS}: تفكير...")
-                content, tool_calls = self._stream_response(messages)
-                if content:
-                    self.chunk.emit(content)
+                self.step_started.emit(step)
+                response_data = self._call_ollama(conversation)
+                if not response_data:
+                    break
+                assistant_content = response_data.get("content", "")
+                tool_calls = response_data.get("tool_calls", [])
+                if assistant_content:
+                    self.chunk.emit(assistant_content)
+                    conversation.append({"role": "assistant", "content": assistant_content})
+                if tool_calls:
+                    conversation.append({"role": "assistant", "content": assistant_content, "tool_calls": tool_calls})
                 if not tool_calls:
-                    self.finished_signal.emit(0)
-                    return
-                messages.append({"role": "assistant", "content": content, "tool_calls": tool_calls})
+                    break
                 for tc in tool_calls:
                     if self._stop:
-                        self.finished_signal.emit(1)
+                        self.cancelled.emit("تم إلغاء الرد الجاري.")
                         return
                     func = tc.get("function", {})
                     name = func.get("name", "")
                     args_raw = func.get("arguments", "{}")
-                    if isinstance(args_raw, str):
-                        try:
-                            args = json.loads(args_raw)
-                        except Exception:
-                            args = {}
-                    else:
-                        args = args_raw
-                    self.tool_action.emit(f"● تنفيذ: {name}({json.dumps(args, ensure_ascii=False)[:100]})")
+                    args = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
+                    if name == "exec":
+                        code = args.get("code", "")
+                        if code == self._prev_code:
+                            self.tool_action.emit("exec", "Duplicate code detected, stopping loop.")
+                            conversation.append({"role": "tool", "name": name, "content": "Duplicate code. Task already done."})
+                            break
+                        self._prev_code = code
+                        self.code_execution.emit(args.get("language", "python"), code)
                     result = execute_tool(name, args)
-                    summary = str(result)[:200] if result else "(empty)"
-                    self.tool_action.emit(f"✓ {name}: {summary}")
-                    messages.append({"role": "tool", "content": str(result)})
-            self.chunk.emit("\n[تم الوصول للحد الأقصى من الخطوات]")
+                    self.tool_action.emit(name, str(result)[:500])
+                    conversation.append({"role": "tool", "name": name, "content": str(result)[:2000]})
+                else:
+                    continue
+                break
+            if self.auto_learn and not self._stop:
+                self._extract_facts()
             self.finished_signal.emit(0)
         except Exception as e:
-            self.error.emit(f"Agent: {e}\n{traceback.format_exc()[-200:]}")
+            self.error.emit(f"Agent: {e}\n{traceback.format_exc()[-500:]}")
 
-    def _stream_response(self, messages: list) -> tuple:
-        content = ""
-        tool_calls = []
-        for attempt in range(OLLAMA_RETRY_COUNT + 1):
-            try:
-                response = requests.post(OLLAMA_URL, json={
+    def _call_ollama(self, conversation) -> dict:
+        response = requests.post(
+            OLLAMA_URL,
+            json={
+                "model": DEFAULT_MODEL,
+                "messages": conversation,
+                "tools": AGENT_TOOLS,
+                "stream": False,
+                "options": {"num_ctx": NUM_CTX},
+            },
+            timeout=(10, 300),
+        )
+        response.raise_for_status()
+        data = response.json()
+        msg = data.get("message", {})
+        return {
+            "content": msg.get("content", ""),
+            "tool_calls": msg.get("tool_calls", []),
+        }
+
+    def _build_initial_messages(self):
+        sys_prompt = self._build_system_prompt()
+        return [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": self.msg},
+        ]
+
+    def _build_system_prompt(self) -> str:
+        parts = []
+
+        parts.append(
+            "You are Walid AI Desktop, an elite autonomous coding agent that runs code on the user's machine."
+        )
+        parts.append(
+            "You have an exec() function. You MUST use it to write and run Python, Shell, or JavaScript code to accomplish tasks."
+        )
+        parts.append(
+            "NEVER just describe what you would do. ALWAYS write and execute actual code via exec()."
+        )
+        parts.append(
+            "When the user asks for something, write Python code that accomplishes it and call exec() to run it."
+        )
+        parts.append(
+            "Do NOT use list_directory or read_file when you can write Python code to do the same thing more powerfully."
+        )
+        parts.append(
+            "MANDATORY: Every Python script you write MUST end with a print() statement showing the result."
+        )
+        parts.append(
+            "If you compute a value, you MUST print it. Never leave a value unprinted."
+        )
+        parts.append(
+            "IMPORTANT: In print() statements, use English text for labels to avoid encoding issues on Windows."
+        )
+        parts.append(
+            "MULTI-STEP: You can call exec() multiple times. After each execution, read the output "
+            "and decide if you need to run more code. Continue until the task is fully complete."
+        )
+        parts.append(
+            "STOP CONDITION: If the code already ran successfully and the output shows the task is done, "
+            "do NOT repeat the same code. Instead, give a final summary in Arabic."
+        )
+        parts.append(
+            "NEVER repeat the exact same code twice. If you already executed code and got results, "
+            "move on to the next step or give your final summary."
+        )
+        parts.append(
+            "After all code execution is done, ALWAYS give a final text summary of what you accomplished in Arabic."
+        )
+        parts.append(
+            f"Your working directory is already set to: {self.workspace_path}"
+        )
+        parts.append(
+            "CRITICAL: Do NOT hardcode Windows paths with backslashes. "
+            "Use '.' or os.getcwd(). The working directory is already set for you. "
+            "If you must use a path, use forward slashes like 'C:/Users/folder'."
+        )
+        parts.append(
+            "Respond in Arabic for explanations, but write code and print statements in English."
+        )
+
+        mode_parts = [MODE_PROMPTS[m] for m in self.selected_modes if m in MODE_PROMPTS]
+        if mode_parts:
+            parts.append("Additional modes: " + " | ".join(mode_parts))
+
+        if self.memory_text:
+            parts.append("Saved memory:\n" + self.memory_text)
+
+        if "rag" in self.selected_modes:
+            chunks = retrieve_relevant_chunks(self.msg, DB_PATH, top_k=TOP_K_RAG)
+            if chunks:
+                parts.append("Knowledge base excerpts:\n" + "\n---\n".join(chunks))
+
+        facts = Database().get_learned_facts(limit=20)
+        if facts:
+            parts.append("Previously learned facts:\n- " + "\n- ".join(facts))
+
+        agents_md = read_agents_md(self.workspace_path)
+        if agents_md:
+            parts.append("AGENTS.md instructions:\n" + agents_md)
+
+        skills = discover_skills(self.workspace_path)
+        if skills:
+            parts.append(format_skills_index(skills))
+
+        return "\n\n".join(parts)
+
+    def _extract_facts(self):
+        try:
+            messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "Extract at most 3 useful, specific facts about the user or their environment "
+                        "from the user's message only. "
+                        "Allowed languages: Arabic or English only. "
+                        "Do NOT output: code snippets, language names, single words, "
+                        "generic phrases, acknowledgments, or meta-commentary. "
+                        "Do NOT describe what the user wants, what a script does, "
+                        "what a folder contains, what the code will do, "
+                        "what the message indicates, or what the user is working with. "
+                        "Only extract concrete personal or environmental facts like: "
+                        "the user's name, their OS, their project name, their tech stack, "
+                        "their preferences, or their specific data. "
+                        "Each fact must be a complete meaningful sentence, minimum 20 characters. "
+                        "Reject any fact shorter than 20 characters or containing fewer than 5 words."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"User message:\n{self.msg}"
+                },
+            ]
+            resp = requests.post(
+                OLLAMA_URL,
+                json={
                     "model": DEFAULT_MODEL,
                     "messages": messages,
-                    "tools": AGENT_TOOLS,
-                    "stream": True,
-                    "options": {"num_ctx": NUM_CTX},
-                }, timeout=OLLAMA_TIMEOUT, stream=True)
-                response.raise_for_status()
-                break
-            except requests.RequestException as e:
-                if attempt < OLLAMA_RETRY_COUNT:
-                    self.tool_action.emit(f"● إعادة المحاولة ({attempt+1}/{OLLAMA_RETRY_COUNT})...")
-                    continue
-                raise
-        for line in response.iter_lines(decode_unicode=True):
-            if self._stop:
-                response.close()
-                return content, tool_calls
-            if not line:
-                continue
-            try:
-                data = json.loads(line)
-            except Exception:
-                continue
-            msg = data.get("message", {})
-            c = msg.get("content", "")
-            if c:
-                content += c
-                self.chunk.emit(c)
-            tc = msg.get("tool_calls")
-            if tc:
-                tool_calls.extend(tc)
-            if data.get("done", False):
-                break
-        response.close()
-        return content, tool_calls
-
-    def _build_messages(self) -> list:
-        mode_parts = [MODE_PROMPTS[m] for m in self.selected_modes if m in MODE_PROMPTS]
-        sys_prompt = SYSTEM_PROMPT_AGENT
-        if mode_parts:
-            sys_prompt += "\n\nتعليمات: " + " | ".join(mode_parts)
-        if self.memory_text:
-            sys_prompt += "\n\nمعلومات محفوظة:\n" + self.memory_text
-        ctx = "\n\n".join(
-            f"ملف: {f['filename']}\n{truncate(f.get('extracted_text') or '', 7000)}"
-            for f in self.files if f.get("extracted_text"))
-        if ctx:
-            sys_prompt += "\n\nمحتوى الملفات المرفوعة:\n" + ctx
-        return [{"role": "system", "content": sys_prompt}, {"role": "user", "content": self.msg}]
-
-
-class StreamWorker(QThread):
-    """Streaming chat from Ollama without tool calling."""
-    chunk = pyqtSignal(str)
-    finished_signal = pyqtSignal(int)
-    error = pyqtSignal(str)
-
-    def __init__(self, msg: str, files: list, selected_modes: list,
-                 regenerate: bool = False, memory_text: str = "", search_payload: dict = None):
-        super().__init__()
-        self.msg = msg
-        self.files = files
-        self.selected_modes = selected_modes
-        self.regenerate = regenerate
-        self.memory_text = memory_text
-        self.search_payload = search_payload or {}
-        self._stop = False
-        self._response = None
-
-    def stop(self):
-        self._stop = True
-        try:
-            if self._response is not None:
-                self._response.close()
+                    "stream": False,
+                    "options": {"num_ctx": 2048, "temperature": 0.2},
+                },
+                timeout=60,
+            )
+            resp.raise_for_status()
+            facts_text = resp.json().get("message", {}).get("content", "")
+            db = Database()
+            for line in facts_text.strip().split("\n"):
+                fact = line.strip().lstrip("-*1234567890. ").strip()
+                if self._is_allowed_fact(fact):
+                    db.add_learned_fact(self.cid, fact)
+                    self.learned_fact.emit(fact)
         except Exception:
             pass
 
-    def run(self):
-        try:
-            ctx = "\n\n".join(
-                f"ملف: {f['filename']}\n{truncate(f.get('extracted_text') or '', 7000)}"
-                for f in self.files if f.get("extracted_text"))
-            mp = [MODE_PROMPTS[m] for m in self.selected_modes if m in MODE_PROMPTS]
-            p = SYSTEM_PROMPT_CHAT
-            if mp:
-                p += "\n\n" + "\n".join(f"- {x}" for x in mp)
-            if self.regenerate:
-                p += "\n\nأعد صياغة الإجابة."
-            if self.memory_text:
-                p += "\n\nمعلومات:\n" + self.memory_text
-            if ctx:
-                p += "\n\nمحتوى:\n" + ctx
-            if self.search_payload.get("web"):
-                p += "\n\n" + SearchEngine.format_results(self.search_payload["web"], "نتائج الويب")
-            if self.search_payload.get("academic"):
-                p += "\n\n" + SearchEngine.format_results(self.search_payload["academic"], "نتائج أكاديمية")
+    def _is_allowed_fact(self, fact: str) -> bool:
+        if not fact or len(fact) < 20:
+            return False
 
-            for attempt in range(OLLAMA_RETRY_COUNT + 1):
-                try:
-                    self._response = requests.post(OLLAMA_URL, json={
-                        "model": DEFAULT_MODEL,
-                        "stream": True,
-                        "messages": [{"role": "system", "content": p},
-                                      {"role": "user", "content": self.msg}],
-                        "options": {"num_ctx": NUM_CTX},
-                    }, timeout=OLLAMA_TIMEOUT, stream=True)
-                    self._response.raise_for_status()
-                    break
-                except requests.RequestException as e:
-                    if attempt < OLLAMA_RETRY_COUNT:
-                        continue
-                    self.error.emit(f"Ollama: {e}")
-                    return
+        word_count = len(fact.split())
+        if word_count < 5:
+            return False
 
-            for line in self._response.iter_lines(decode_unicode=True):
-                if self._stop:
-                    self.finished_signal.emit(1)
-                    return
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                except Exception:
-                    continue
-                c = data.get("message", {}).get("content", "")
-                if c:
-                    self.chunk.emit(c)
-                if data.get("done", False):
-                    break
-            self.finished_signal.emit(0)
-        except Exception as e:
-            self.error.emit(str(e))
-        finally:
-            try:
-                if self._response is not None:
-                    self._response.close()
-            except Exception:
-                pass
+        lowered = fact.strip().lower()
 
+        if lowered in BANNED_FACTS:
+            return False
 
-class SearchWorker(QThread):
-    """Runs web/academic search in background. Never fails."""
-    done = pyqtSignal(dict)
+        for banned in BANNED_FACTS:
+            if lowered == banned or lowered.startswith(banned):
+                return False
 
-    def __init__(self, query: str, selected_modes: list):
-        super().__init__()
-        self.query = query
-        self.selected_modes = selected_modes
+        for prefix in BANNED_PREFIXES:
+            if lowered.startswith(prefix):
+                return False
 
-    def run(self):
-        payload = {"web": [], "academic": []}
-        if "web" in self.selected_modes or "advanced" in self.selected_modes:
-            payload["web"] = SearchEngine.web_search(self.query)
-        if "academic" in self.selected_modes or "advanced" in self.selected_modes:
-            payload["academic"] = SearchEngine.academic_search(self.query)
-        self.done.emit(payload)
+        allowed_pattern = re.compile(
+            r"^[A-Za-z0-9\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\s.,:;!?_\-\'()\[\]/]+$"
+        )
+        if not allowed_pattern.match(fact):
+            return False
 
-
-class LearnWorker(QThread):
-    """Extracts key information from user message to save to memory."""
-    done = pyqtSignal(str, str)
-    error = pyqtSignal(str)
-
-    def __init__(self, msg: str, mem: str, modes: list):
-        super().__init__()
-        self.msg = msg
-        self.mem = mem
-        self.modes = modes
-
-    def run(self):
-        try:
-            ms = ", ".join(self.modes)
-            p = f"حلل ({ms}). JSON: {{\"key\":\"\",\"value\":\"\",\"key\":\"عنوان\",\"value\":\"معلومة\"}}."
-            if self.mem:
-                p += "\n" + self.mem
-            r = requests.post(OLLAMA_URL, json={
-                "model": DEFAULT_MODEL,
-                "stream": False,
-                "messages": [{"role": "system", "content": p},
-                              {"role": "user", "content": self.msg}],
-            }, timeout=60)
-            r.raise_for_status()
-            c = r.json().get("message", {}).get("content", "").strip()
-            m = re.search(r"\{.*\}", c, re.DOTALL)
-            if m:
-                d = json.loads(m.group())
-                self.done.emit(d.get("key", ""), d.get("value", ""))
-            else:
-                self.done.emit("", "")
-        except Exception as e:
-            self.error.emit(str(e))
+        return re.search(r"[A-Za-z\u0600-\u06FF]", fact) is not None

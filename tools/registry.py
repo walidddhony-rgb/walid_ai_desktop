@@ -1,118 +1,56 @@
-"""Agent tool registry and dispatcher."""
-from __future__ import annotations
-import json
-from tools.file_tools import (
-    list_directory, read_file, read_project_files,
-    create_file, create_directory, move_file, archive_folder,
-)
-from tools.memory_tools import save_memory, get_memory
+from tools.file_tools import create_directory, create_file, list_directory, move_file, read_file
+from tools.memory_tools import get_memory, save_memory
+from tools.learning_tools import learn_from_file, learn_from_text, search_knowledge
+from tools.exec_tool import EXEC_TOOL_SCHEMA
 from search.engine import SearchEngine
 
 AGENT_TOOLS = [
-    {"type": "function", "function": {
-        "name": "list_directory",
-        "description": "List files and directories in a path",
-        "parameters": {"type": "object",
-            "properties": {"path": {"type": "string", "description": "Directory path"}},
-            "required": ["path"]}}},
-    {"type": "function", "function": {
-        "name": "read_file",
-        "description": "Read the content of a single file",
-        "parameters": {"type": "object",
-            "properties": {"path": {"type": "string", "description": "File path"}},
-            "required": ["path"]}}},
-    {"type": "function", "function": {
-        "name": "read_project_files",
-        "description": "Read ALL code files in a project directory recursively",
-        "parameters": {"type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "Project root directory"},
-                "extensions": {"type": "array", "items": {"type": "string"},
-                    "description": "File extensions, e.g. ['py','js','html']"}},
-            "required": ["path"]}}},
-    {"type": "function", "function": {
-        "name": "web_search",
-        "description": "Search the web for current information",
-        "parameters": {"type": "object",
-            "properties": {"query": {"type": "string", "description": "Search query"}},
-            "required": ["query"]}}},
-    {"type": "function", "function": {
-        "name": "academic_search",
-        "description": "Search academic sources: PubMed, DOI, Semantic Scholar",
-        "parameters": {"type": "object",
-            "properties": {"query": {"type": "string", "description": "Academic search query"}},
-            "required": ["query"]}}},
-    {"type": "function", "function": {
-        "name": "save_memory",
-        "description": "Save information to long-term memory for future use",
-        "parameters": {"type": "object",
-            "properties": {
-                "key": {"type": "string", "description": "Short title in Arabic"},
-                "value": {"type": "string", "description": "The information to remember"}},
-            "required": ["key", "value"]}}},
-    {"type": "function", "function": {
-        "name": "get_memory",
-        "description": "Retrieve all saved memories",
-        "parameters": {"type": "object", "properties": {}}}},
-    {"type": "function", "function": {
-        "name": "create_file",
-        "description": "Create a new file with content",
-        "parameters": {"type": "object",
-            "properties": {
-                "path": {"type": "string", "description": "File path"},
-                "content": {"type": "string", "description": "File content"}},
-            "required": ["path", "content"]}}},
-    {"type": "function", "function": {
-        "name": "create_directory",
-        "description": "Create a new directory",
-        "parameters": {"type": "object",
-            "properties": {"path": {"type": "string", "description": "Directory path"}},
-            "required": ["path"]}}},
-    {"type": "function", "function": {
-        "name": "move_file",
-        "description": "Move or rename a file",
-        "parameters": {"type": "object",
-            "properties": {
-                "src": {"type": "string", "description": "Source path"},
-                "dest": {"type": "string", "description": "Destination path"}},
-            "required": ["src", "dest"]}}},
-    {"type": "function", "function": {
-        "name": "archive_folder",
-        "description": "Archive a folder into a zip file",
-        "parameters": {"type": "object",
-            "properties": {
-                "src": {"type": "string", "description": "Source folder"},
-                "dest": {"type": "string", "description": "Destination directory"}},
-            "required": ["src", "dest"]}}},
+    EXEC_TOOL_SCHEMA,
+    {"type": "function", "function": {"name": "list_directory", "description": "List files and directories in a path", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "read_file", "description": "Read a single file", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "web_search", "description": "Search the web", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "academic_search", "description": "Search academic sources", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
+    {"type": "function", "function": {"name": "save_memory", "description": "Save a key-value memory", "parameters": {"type": "object", "properties": {"key": {"type": "string"}, "value": {"type": "string"}}, "required": ["key", "value"]}}},
+    {"type": "function", "function": {"name": "get_memory", "description": "Get all memory", "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {"name": "create_file", "description": "Create file in workspace", "parameters": {"type": "object", "properties": {"path": {"type": "string"}, "content": {"type": "string"}}, "required": ["path", "content"]}}},
+    {"type": "function", "function": {"name": "create_directory", "description": "Create directory in workspace", "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
+    {"type": "function", "function": {"name": "move_file", "description": "Move file", "parameters": {"type": "object", "properties": {"src": {"type": "string"}, "dest": {"type": "string"}}, "required": ["src", "dest"]}}},
+    {"type": "function", "function": {"name": "learn_from_file", "description": "Ingest a file into the knowledge base (RAG)", "parameters": {"type": "object", "properties": {"filepath": {"type": "string"}}, "required": ["filepath"]}}},
+    {"type": "function", "function": {"name": "learn_from_text", "description": "Learn facts from text", "parameters": {"type": "object", "properties": {"text": {"type": "string"}, "cid": {"type": "string"}}, "required": ["text"]}}},
+    {"type": "function", "function": {"name": "search_knowledge", "description": "Search the local knowledge base (RAG retrieval)", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
 ]
 
+EXEC_CALLBACK = None
 
-def execute_tool(name: str, args: dict) -> str:
-    """Execute a tool by name with validated arguments."""
+
+def set_exec_callback(cb):
+    global EXEC_CALLBACK
+    EXEC_CALLBACK = cb
+
+
+def execute_tool(name, args):
+    if name == "exec":
+        if EXEC_CALLBACK:
+            return EXEC_CALLBACK(args.get("language", "python"), args.get("code", ""))
+        return "exec callback not set"
+    dispatch = {
+        "list_directory": lambda a: list_directory(a.get("path", ".")),
+        "read_file": lambda a: read_file(a.get("path", "")),
+        "web_search": lambda a: SearchEngine.web_search(a.get("query", "")),
+        "academic_search": lambda a: SearchEngine.academic_search(a.get("query", "")),
+        "save_memory": lambda a: save_memory(a.get("key", ""), a.get("value", "")),
+        "get_memory": lambda a: get_memory(),
+        "create_file": lambda a: create_file(a.get("path", ""), a.get("content", "")),
+        "create_directory": lambda a: create_directory(a.get("path", "")),
+        "move_file": lambda a: move_file(a.get("src", ""), a.get("dest", "")),
+        "learn_from_file": lambda a: learn_from_file(a.get("filepath", "")),
+        "learn_from_text": lambda a: learn_from_text(a.get("text", ""), a.get("cid", "")),
+        "search_knowledge": lambda a: search_knowledge(a.get("query", "")),
+    }
+    fn = dispatch.get(name)
+    if fn is None:
+        return f"Unknown tool: {name}"
     try:
-        if name == "list_directory":
-            return list_directory(args.get("path", "."))
-        elif name == "read_file":
-            return read_file(args.get("path", ""))
-        elif name == "read_project_files":
-            return read_project_files(args.get("path", "."), args.get("extensions"))
-        elif name == "web_search":
-            return json.dumps(SearchEngine.web_search(args.get("query", "")), ensure_ascii=False)
-        elif name == "academic_search":
-            return json.dumps(SearchEngine.academic_search(args.get("query", "")), ensure_ascii=False)
-        elif name == "save_memory":
-            return save_memory(args.get("key", ""), args.get("value", ""))
-        elif name == "get_memory":
-            return get_memory()
-        elif name == "create_file":
-            return create_file(args.get("path", ""), args.get("content", ""))
-        elif name == "create_directory":
-            return create_directory(args.get("path", ""))
-        elif name == "move_file":
-            return move_file(args.get("src", ""), args.get("dest", ""))
-        elif name == "archive_folder":
-            return archive_folder(args.get("src", ""), args.get("dest", "."))
-        else:
-            return f"Unknown tool: {name}"
+        return fn(args)
     except Exception as e:
-        return f"Tool error ({name}): {e}"
+        return f"Tool error: {e}"
