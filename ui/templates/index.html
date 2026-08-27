@@ -1,1 +1,50 @@
-<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Walid AI</title><link rel="stylesheet" href="/static/css/style.css"><script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script><script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script></head><body><div id="app"><aside><div class="brand">◆ Walid AI <button id="theme">☀️</button></div><input type="text" id="search" placeholder="بحث في المحادثات..." class="search"><button id="new">+ محادثة جديدة</button><button id="export" title="تصدير المحادثة">📤 تصدير</button><div id="convs"></div></aside><main><header><select id="model"><option value="fast">⚡ سريع</option><option value="smart">🧠 متقدم</option><option value="code">💻 كود</option></select><span id="status" class="status idle">● جاهز</span></header><section id="welcome"><h2>مرحبًا بك في Walid AI</h2><p>تحدث أو ارفع ملفات واسأل عن محتواها.</p></section><section id="msgs"></section><div id="file-chips"></div><footer><input type="file" id="file" hidden accept=".pdf,.txt,.md,.docx,.wav,.webm,.mp3"><button id="up" title="رفع">📎</button><button id="mic" title="تحدث صوتيًا">🎤</button><textarea id="input" placeholder="اكتب أو تحدث..."></textarea><button id="stop" style="display:none">■</button><button id="send">إرسال</button></footer></main><aside id="files-panel"><h3>📁 الملفات</h3><div id="files">لا توجد ملفات.</div></aside></div><script src="/static/js/app.js"></script></body></html>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Walid AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body>
+<div id="app">
+    <aside>
+        <div class="brand">
+            <button onclick="document.body.classList.toggle('light')">🌙</button>
+            Walid AI
+        </div>
+        <input class="search" id="searchInput" placeholder="بحث في المحادثات..." oninput="searchConv()">
+        <button onclick="newConv()">+ محادثة جديدة</button>
+        <div id="convList"></div>
+    </aside>
+    <main>
+        <header>
+            <select id="modelSelect">
+                <option value="qwen2.5:7b">qwen2.5:7b</option>
+                <option value="qwen2.5:14b">qwen2.5:14b</option>
+                <option value="qwen2.5-coder:14b">qwen2.5-coder:14b</option>
+            </select>
+            <span id="status" class="status idle">● جاهز</span>
+        </header>
+        <div id="msgs">
+            <div id="welcome">مرحبًا بك في Walid AI<br><small>تحدث أو ارفع ملفات واسأل عن محتواها.</small></div>
+        </div>
+        <div id="file-chips"></div>
+        <footer>
+            <button id="mic" onclick="toggleMic()">🎤</button>
+            <textarea id="input" placeholder="اكتب رسالتك..." rows="1"></textarea>
+            <button id="send" onclick="sendMsg()">إرسال</button>
+            <button id="stop" onclick="stopGen()" style="display:none">إيقاف</button>
+            <button onclick="uploadFile()">📎</button>
+        </footer>
+    </main>
+    <div id="files-panel">
+        <h3>📁 الملفات</h3>
+        <div id="fileList"></div>
+    </div>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
