@@ -1,7 +1,0 @@
-APPLY_INSTRUCTIONS.txt
-README.md
-SYNTAX_CHECK.txt
-agent/__pycache__/worker.cpython-312.pyc
-agent/worker.py
-ui/__pycache__/main_window.cpython-312.pyc
-ui/main_window.py
