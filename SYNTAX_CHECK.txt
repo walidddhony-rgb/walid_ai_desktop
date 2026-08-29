@@ -1,2 +1,0 @@
-agent/worker.py: OK
-ui/main_window.py: OK
