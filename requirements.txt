@@ -1,0 +1,10 @@
+PyQt6
+requests
+duckduckgo-search
+pyaudio
+openai-whisper
+faster-whisper
+pyttsx3
+edge-tts
+PyMuPDF
+python-docx
