@@ -8,6 +8,79 @@ version = "10.1.0"
 description = "Local desktop AI agent built with PyQt6 and Ollama"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "walidddhony-rgb" },
+]
+keywords = ["ai-agent", "ollama", "pyqt6", "local-llm", "desktop-assistant", "rag", "voice-assistant"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Core runtime: GUI, agent loop, search, document processing
+dependencies = [
+    "PyQt6>=6.6",
+    "requests>=2.31",
+    # NOTE: duckduckgo-search is the legacy name; the maintained successor
+    # is "ddgs". Keep this until you migrate the imports in search/, then
+    # switch to: ddgs>=9.0
+    "duckduckgo-search>=6.1",
+    "PyMuPDF>=1.24",
+    "python-docx>=1.1",
+]
+
+[project.optional-dependencies]
+# Heavy voice stack (Whisper models, TTS engines, audio I/O) — install with:
+#   pip install -e .[voice]
+voice = [
+    "pyaudio>=0.2.13",
+    "openai-whisper>=20231117",
+    "faster-whisper>=1.0",
+    "pyttsx3>=2.90",
+    "edge-tts>=6.1",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+    "pre-commit>=3.7",
+]
+
+[project.scripts]
+walid-ai = "ui.app:run_app"
+
+[project.urls]
+Homepage = "https://github.com/walidddhony-rgb/walid_ai_desktop"
+Issues = "https://github.com/walidddhony-rgb/walid_ai_desktop/issues"
 
 [tool.setuptools.packages.find]
-include = ["core*", "db*", "search*", "tools*", "agent*", "ui*"]
+include = [
+    "core*",
+    "db*",
+    "search*",
+    "tools*",
+    "agent*",
+    "ui*",
+    "voice*",
+    "knowledge*",
+    "packaging*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true

@@ -1,0 +1,46 @@
+# ============================================================
+# Walid AI Desktop - .gitignore
+# ============================================================
+
+# --- Python cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.egg-info/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+
+# --- Runtime / user data (keep local copies, never commit) ---
+data/
+uploads/
+report.txt
+logs/
+*.log
+# Uncomment if your DB files live outside data/:
+# *.db
+# *.sqlite3
+
+# --- Packaging / build artifacts ---
+build/
+dist/
+*.spec
+
+# --- OS files ---
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# --- Editors ---
+.idea/
+.vscode/
+*.swp
+*~
