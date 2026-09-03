@@ -9,6 +9,36 @@ Walid AI Desktop v10.1.0
 
 A local-first desktop AI agent built with **PyQt6** and **Ollama**: voice, document understanding, a RAG knowledge base, web search, and safe file/code tools with visual diff review — all running on your machine.
 
+Quick Start
+-----------
+
+### Windows (Automated)
+
+```powershell
+# Clone or download the repository
+cd walid_ai_desktop
+
+# Run the bootstrap script
+.\scripts\bootstrap_windows.ps1
+```
+
+### Windows (Manual)
+
+See the complete [Windows Installation Guide](docs/INSTALL_WINDOWS.md) for detailed step-by-step instructions.
+
+### Manual (All Platforms)
+
+```bash
+# Install Ollama and pull a model
+ollama pull llama3.2:3b
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run the application
+python main.py
+```
+
 Highlights (v8 – v10)
 ---------------------
 
@@ -68,6 +98,8 @@ Repository layout
 | `voice/` | STT / TTS engines |
 | `ui/` | PyQt6 application, main window, dialogs, themes |
 | `tests/` | Test suite |
+| `docs/` | Documentation (installation guides, user guides) |
+| `scripts/` | Automation scripts (bootstrap, utilities) |
 
 Windows run
 -----------
@@ -77,6 +109,8 @@ ollama serve
 pip install -r requirements.txt
 python main.py
 ```
+
+For a complete Windows setup guide, see [docs/INSTALL_WINDOWS.md](docs/INSTALL_WINDOWS.md).
 
 Changelog
 ---------
