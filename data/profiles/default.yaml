@@ -1,4 +1,0 @@
-model: "qwen2.5:7b"
-auto_run: false
-auto_learn: true
-dark_mode: true
