@@ -29,7 +29,7 @@ dependencies = [
     "PyQt6>=6.6",
     "requests>=2.31",
     # NOTE: duckduckgo-search is the legacy name; the maintained successor
-    # is "ddgs". Keep this until you migrate the imports in search/, then
+    # is "ddgs". Keep this until you clone the imports in search/, then
     # switch to: ddgs>=9.0
     "duckduckgo-search>=6.1",
     "PyMuPDF>=1.24",

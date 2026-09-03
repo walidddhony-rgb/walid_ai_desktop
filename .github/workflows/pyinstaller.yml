@@ -1,0 +1,45 @@
+name: PyInstaller Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller>=6.0
+
+      - name: Build EXE with PyInstaller
+        run: |
+          pyinstaller --name walid_ai_desktop --onedir --windowed --icon=ui/static/app.ico --add-data "ui/templates;ui/templates" --add-data "ui/static;ui/static" main.py
+
+      - name: Create release archive
+        run: |
+          cd dist
+          7z a -tzip walid_ai_desktop-win-x64.zip walid_ai_desktop/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          files: dist/walid_ai_desktop-win-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
