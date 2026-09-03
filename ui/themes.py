@@ -1,9 +1,8 @@
-"""Dark and light QSS themes."""
-
 DARK_THEME = """
 QMainWindow,QWidget{background:#1e1e2e;color:#e0e0e0}
 QPushButton{background:#3b3b4f;border:none;padding:8px 16px;border-radius:6px;font-weight:bold}
-QPushButton:hover{background:#4a4a5f}QPushButton:checked{background:#4CAF50}
+QPushButton:hover{background:#4a4a5f}
+QPushButton:checked{background:#4CAF50}
 QTextEdit,QLineEdit{background:#2a2a3e;border:1px solid #444;padding:6px;border-radius:4px}
 QListWidget{background:#252538;border:1px solid #333;border-radius:6px}
 QListWidget::item{padding:8px}
@@ -20,7 +19,8 @@ QMenu{background:#2a2a3e;color:#e0e0e0}
 LIGHT_THEME = """
 QMainWindow,QWidget{background:#f5f5f5;color:#333}
 QPushButton{background:#4CAF50;border:none;padding:8px 16px;border-radius:6px;font-weight:bold;color:white}
-QPushButton:hover{background:#45a049}QPushButton:checked{background:#2E7D32}
+QPushButton:hover{background:#45a049}
+QPushButton:checked{background:#2E7D32}
 QTextEdit,QLineEdit{background:white;border:1px solid #ccc;padding:6px;border-radius:4px}
 QListWidget{background:white;border:1px solid #ddd;border-radius:6px}
 QListWidget::item{padding:8px}
