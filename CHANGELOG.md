@@ -12,26 +12,30 @@ Format: [Keep a Changelog 1.1](https://keepachangelog.com/en/1.1.0/) · Versioni
 - PyInstaller builds attached to GitHub Releases
 - Migration from `duckduckgo-search` to the maintained `ddgs` package
 
-## [10.1.0] — TODO: date
+## [10.1.0] - 2026-09-03
+
+> Features below were introduced between v8 and v10 and are consolidated under this entry; intermediate releases were not tracked separately.
 
 ### Added
-- Centralized logging configuration (`core/logging_config.py`)
-- Project packaging metadata (`pyproject.toml`), `pytest.ini`, `requirements-dev.txt`
-- Modular architecture split into packages: `agent`, `core`, `db`, `knowledge`, `packaging`, `search`, `tools`, `ui`, `voice`
+- **Tool registry** (`tools/registry.py`): centralized registration and dispatch of agent tools
+- **Modular tool suite**: file tools (`file_tools.py`), workspace tools, code execution tool (`exec_tool.py`), memory tools, learning tools, and a system agent (`system_agent.py`)
+- **Subagents** (`core/subagent.py`): delegate focused subtasks to separate agent instances
+- **Hooks system** (`core/hooks.py`): extension points in the agent lifecycle
+- **Skills** (`core/skills.py`): packaged, reusable agent capabilities
+- **AGENTS.md support** (`core/agents_md.py`): project-level agent instructions
+- **Sandboxed code execution** (`core/sandbox.py`, `core/code_executor.py`)
+- **Sessions & profiles** (`core/session.py`, `core/profiles.py`)
+- **RAG knowledge base**: document ingestion (`knowledge/ingestor.py`) with background indexing (`knowledge/index_worker.py`), backed by SQLite storage and embeddings (`db/database.py`, `db/embeddings.py`, `db/schema.py`)
+- **Web search** (`search/engine.py`) via DuckDuckGo
+- **Voice**: speech-to-text and text-to-speech engines (`voice/stt_engine.py`, `voice/tts_engine.py`) using openai-whisper / faster-whisper and pyttsx3 / edge-tts
+- **Centralized logging** (`core/logging_config.py`)
+- **UI theming and dialogs** for the PyQt6 interface (`ui/themes.py`, `ui/dialogs.py`)
 
-> **TODO:** document the features introduced between v7 and v10, e.g. one line each for:
-> `core/hooks.py`, `core/subagent.py`, `core/skills.py`, `core/agents_md.py`,
-> `core/profiles.py`, `core/session.py`, `core/sandbox.py`, `core/code_executor.py`
+### Project
+- Repository reorganized into modular packages: `agent`, `core`, `db`, `knowledge`, `packaging`, `search`, `tools`, `ui`, `voice`
+- Packaging metadata: `pyproject.toml`, `pytest.ini`, `requirements-dev.txt`, and a `tests/` suite
 
-## [9.0.0] — TODO: date
-
-> **TODO:** summarize the changes shipped in this version.
-
-## [8.0.0] — TODO: date
-
-> **TODO:** summarize the changes shipped in this version.
-
-## [7.0.0] — TODO: date
+## [7.0.0] - 2026-08-27
 
 ### Added
 - **Diff Review**: unified diff preview (green = additions, red = deletions) shown before the agent creates or edits files; new files show a full-content preview; rejecting cancels the change; per-file auto-apply option for the rest of the session
