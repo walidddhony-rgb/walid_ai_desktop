@@ -1,4 +1,5 @@
 """Smoke test: database initializes and basic CRUD works."""
+
 from db.database import Database
 
 

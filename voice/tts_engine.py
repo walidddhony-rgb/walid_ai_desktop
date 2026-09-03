@@ -1,14 +1,23 @@
+import asyncio
+import os
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
+
 from PyQt6.QtCore import QThread, pyqtSignal
 
+pyttsx3: Any | None = None
+HAS_PYTTSX = False
+
 try:
-    import pyttsx3
+    import pyttsx3 as _pyttsx3
+
+    pyttsx3 = _pyttsx3
     HAS_PYTTSX = True
 except ImportError:
-    HAS_PYTTSX = False
+    pass
 
 
 class TTSSpeakWorker(QThread):
@@ -24,37 +33,37 @@ class TTSSpeakWorker(QThread):
     def run(self):
         if not self.text.strip():
             return
+
         self.started_speaking.emit()
         try:
             if self.use_edge:
                 self._speak_edge(self.text)
-            elif HAS_PYTTSX:
+            elif HAS_PYTTSX and pyttsx3 is not None:
                 engine = pyttsx3.init()
-                engine.setProperty('rate', 160)
+                engine.setProperty("rate", 160)
                 engine.say(self.text)
                 engine.runAndWait()
             else:
                 self._speak_edge(self.text)
-        except Exception as e:
-            self.error.emit(str(e))
+        except Exception as exc:
+            self.error.emit(str(exc))
         finally:
             self.finished_speaking.emit()
 
     def _speak_edge(self, text: str):
-        import asyncio
         try:
             import edge_tts
-        except ImportError:
-            raise RuntimeError('Neither pyttsx3 nor edge-tts is installed')
+        except ImportError as exc:
+            raise RuntimeError("Neither pyttsx3 nor edge-tts is installed") from exc
 
         async def _run():
-            tmp = Path(tempfile.gettempdir()) / 'walid_tts.mp3'
-            communicate = edge_tts.Communicate(text, 'ar-EG-SalmaNeural')
+            tmp = Path(tempfile.gettempdir()) / "walid_tts.mp3"
+            communicate = edge_tts.Communicate(text, "ar-EG-SalmaNeural")
             await communicate.save(str(tmp))
-            if sys.platform == 'win32':
-                import os
+
+            if sys.platform == "win32":
                 os.startfile(str(tmp))
             else:
-                subprocess.run(['mpg123', str(tmp)], check=False)
+                subprocess.run(["mpg123", str(tmp)], check=False)
 
         asyncio.run(_run())

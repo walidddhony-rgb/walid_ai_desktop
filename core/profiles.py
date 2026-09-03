@@ -1,4 +1,5 @@
-from pathlib import Path
+from typing import Any
+
 from core.config import DATA_DIR
 
 PROFILES_DIR = DATA_DIR / "profiles"
@@ -6,7 +7,7 @@ PROFILES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _parse_yaml(text: str) -> dict:
-    result = {}
+    result: dict[str, Any] = {}
     for line in text.splitlines():
         line = line.strip()
         if not line or line.startswith("#"):
@@ -47,10 +48,10 @@ def save_profile(name: str, data: dict) -> str:
     for k, v in data.items():
         if isinstance(v, bool):
             lines.append(f"{k}: {str(v).lower()}")
-        elif isinstance(v, (int, float)):
+        elif isinstance(v, int | float):
             lines.append(f"{k}: {v}")
         else:
-            lines.append(f"{k}: \"{v}\"")
+            lines.append(f'{k}: "{v}"')
     p.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return str(p)
 
@@ -58,9 +59,12 @@ def save_profile(name: str, data: dict) -> str:
 def ensure_default_profile():
     default = PROFILES_DIR / "default.yaml"
     if not default.exists():
-        save_profile("default", {
-            "model": "qwen2.5:7b",
-            "auto_run": False,
-            "auto_learn": True,
-            "dark_mode": True,
-        })
+        save_profile(
+            "default",
+            {
+                "model": "qwen2.5:7b",
+                "auto_run": False,
+                "auto_learn": True,
+                "dark_mode": True,
+            },
+        )

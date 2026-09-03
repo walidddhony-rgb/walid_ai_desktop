@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 
@@ -32,12 +31,14 @@ def discover_skills(workspace_path: str) -> list:
                         break
                     if low.startswith("# name:") or low.startswith("name:"):
                         name = line.split(":", 1)[1].strip() or name
-                skills.append({
-                    "name": name,
-                    "description": description,
-                    "path": str(skill_md),
-                    "folder": str(item),
-                })
+                skills.append(
+                    {
+                        "name": name,
+                        "description": description,
+                        "path": str(skill_md),
+                        "folder": str(item),
+                    }
+                )
             except Exception:
                 pass
     return skills

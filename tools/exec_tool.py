@@ -9,14 +9,11 @@ EXEC_TOOL_SCHEMA = {
                 "language": {
                     "type": "string",
                     "enum": ["python", "shell", "javascript"],
-                    "description": "The programming language to execute"
+                    "description": "The programming language to execute",
                 },
-                "code": {
-                    "type": "string",
-                    "description": "The code to execute"
-                }
+                "code": {"type": "string", "description": "The code to execute"},
             },
-            "required": ["language", "code"]
-        }
-    }
+            "required": ["language", "code"],
+        },
+    },
 }

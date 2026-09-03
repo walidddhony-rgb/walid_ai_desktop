@@ -4,6 +4,7 @@ import sys
 import tempfile
 import traceback
 from pathlib import Path
+
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
@@ -31,6 +32,7 @@ class CodeExecutionWorker(QThread):
 
     def run(self):
         from core.sandbox import classify_action, is_dangerous
+
         if is_dangerous(self.code):
             self.error.emit("تم رفض الكود لأنه يحتوي على أنماط خطيرة.")
             return

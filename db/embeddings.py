@@ -1,6 +1,7 @@
 import json
 import math
 import sqlite3
+
 import requests
 
 from core.config import EMBED_MODEL, OLLAMA_EMBED_URL
@@ -8,7 +9,9 @@ from core.config import EMBED_MODEL, OLLAMA_EMBED_URL
 
 def get_embedding(text: str):
     try:
-        resp = requests.post(OLLAMA_EMBED_URL, json={"model": EMBED_MODEL, "prompt": text}, timeout=30)
+        resp = requests.post(
+            OLLAMA_EMBED_URL, json={"model": EMBED_MODEL, "prompt": text}, timeout=30
+        )
         resp.raise_for_status()
         return resp.json().get("embedding", [])
     except Exception:
@@ -18,7 +21,7 @@ def get_embedding(text: str):
 def cosine_similarity(a, b):
     if not a or not b or len(a) != len(b):
         return 0.0
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=False))
     na = math.sqrt(sum(x * x for x in a))
     nb = math.sqrt(sum(y * y for y in b))
     if na == 0 or nb == 0:
@@ -37,9 +40,9 @@ def retrieve_relevant_chunks(query, db_path, top_k=5):
     scored = []
     for r in rows:
         try:
-            emb = json.loads(r['embedding']) if r['embedding'] else []
+            emb = json.loads(r["embedding"]) if r["embedding"] else []
         except Exception:
             emb = []
-        scored.append((cosine_similarity(query_emb, emb), r['chunk_text']))
+        scored.append((cosine_similarity(query_emb, emb), r["chunk_text"]))
     scored.sort(key=lambda x: x[0], reverse=True)
     return [text for _, text in scored[:top_k]]

@@ -1,6 +1,7 @@
-import threading
 import shutil
+import threading
 from pathlib import Path
+
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from core.utils import sanitize_path, truncate
@@ -31,8 +32,8 @@ class FileChangeBridge(QObject):
         self._event.set()
 
 
-_bridge = None
-_auto_apply_files = set()
+_bridge: FileChangeBridge | None = None
+_auto_apply_files: set[str] = set()
 
 
 def set_bridge(bridge):

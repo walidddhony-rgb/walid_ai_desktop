@@ -1,8 +1,14 @@
 import difflib
 from pathlib import Path
-from PyQt6.QtCore import Qt
+
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QTextEdit, QLabel, QCheckBox
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
 )
 
 
@@ -11,9 +17,7 @@ def generate_diff(old_content, new_content, filename="file"):
     new_lines = new_content.splitlines(keepends=True)
     fromfile = filename + " (original)"
     tofile = filename + " (new)"
-    diff = difflib.unified_diff(
-        old_lines, new_lines, fromfile=fromfile, tofile=tofile, lineterm=""
-    )
+    diff = difflib.unified_diff(old_lines, new_lines, fromfile=fromfile, tofile=tofile, lineterm="")
     return "".join(diff)
 
 
@@ -32,15 +36,15 @@ def format_diff_html(diff_text):
     for line in lines:
         escaped = line.replace("<", "&lt;").replace(">", "&gt;")
         if line.startswith("+++") or line.startswith("---"):
-            html_parts.append('<span class="hdr">' + escaped + '</span>')
+            html_parts.append('<span class="hdr">' + escaped + "</span>")
         elif line.startswith("+") and not line.startswith("+++"):
-            html_parts.append('<span class="add">' + escaped + '</span>')
+            html_parts.append('<span class="add">' + escaped + "</span>")
         elif line.startswith("-") and not line.startswith("---"):
-            html_parts.append('<span class="del">' + escaped + '</span>')
+            html_parts.append('<span class="del">' + escaped + "</span>")
         elif line.startswith("@@"):
-            html_parts.append('<span class="hdr">' + escaped + '</span>')
+            html_parts.append('<span class="hdr">' + escaped + "</span>")
         else:
-            html_parts.append('<span class="ctx">' + escaped + '</span>')
+            html_parts.append('<span class="ctx">' + escaped + "</span>")
         html_parts.append("\n")
     html_parts.append("</pre>")
     return "".join(html_parts)
@@ -53,7 +57,7 @@ class DiffReviewDialog(QDialog):
         self.old_content = old_content
         self.new_content = new_content
         self.approved = False
-        self.create_file = (not old_content)
+        self.create_file = not old_content
         self.setup_ui()
 
     def setup_ui(self):
@@ -91,12 +95,16 @@ class DiffReviewDialog(QDialog):
 
         buttons = QHBoxLayout()
         approve_btn = QPushButton("موافقة وتطبيق")
-        approve_btn.setStyleSheet("background: #28a745; color: white; padding: 10px 20px; font-weight: bold;")
+        approve_btn.setStyleSheet(
+            "background: #28a745; color: white; padding: 10px 20px; font-weight: bold;"
+        )
         approve_btn.clicked.connect(self.on_approve)
         buttons.addWidget(approve_btn)
 
         reject_btn = QPushButton("رفض")
-        reject_btn.setStyleSheet("background: #dc3545; color: white; padding: 10px 20px; font-weight: bold;")
+        reject_btn.setStyleSheet(
+            "background: #dc3545; color: white; padding: 10px 20px; font-weight: bold;"
+        )
         reject_btn.clicked.connect(self.on_reject)
         buttons.addWidget(reject_btn)
         layout.addLayout(buttons)

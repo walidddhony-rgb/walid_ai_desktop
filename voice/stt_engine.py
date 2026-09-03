@@ -1,25 +1,34 @@
 import tempfile
 import wave
 from pathlib import Path
+from typing import Any
+
 from PyQt6.QtCore import QThread, pyqtSignal
 
+from core.config import WHISPER_MODEL
+
+pyaudio: Any | None = None
+HAS_PYAUDIO = False
+
 try:
-    import pyaudio
+    import pyaudio as _pyaudio
+
+    pyaudio = _pyaudio
     HAS_PYAUDIO = True
 except ImportError:
-    HAS_PYAUDIO = False
+    pass
 
 try:
     import whisper
-    HAS_WHISPER = 'openai'
+
+    HAS_WHISPER: str | bool = "openai"
 except ImportError:
     try:
         from faster_whisper import WhisperModel
-        HAS_WHISPER = 'faster'
+
+        HAS_WHISPER = "faster"
     except ImportError:
         HAS_WHISPER = False
-
-from core.config import WHISPER_MODEL
 
 
 class VoiceRecorder(QThread):
@@ -38,11 +47,17 @@ class VoiceRecorder(QThread):
 
     def run(self):
         if not HAS_PYAUDIO:
-            self.error.emit('PyAudio not installed. Run: pip install pyaudio')
+            self.error.emit("PyAudio not installed. Run: pip install pyaudio")
             return
         try:
             pa = pyaudio.PyAudio()
-            stream = pa.open(format=pyaudio.paInt16, channels=1, rate=self.rate, input=True, frames_per_buffer=self.chunk)
+            stream = pa.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=self.rate,
+                input=True,
+                frames_per_buffer=self.chunk,
+            )
             while not self._stop:
                 data = stream.read(self.chunk, exception_on_overflow=False)
                 self.frames.append(data)
@@ -64,17 +79,19 @@ class VoiceSTTWorker(QThread):
 
     def run(self):
         if not HAS_WHISPER:
-            self.error.emit('Whisper not installed. Run: pip install openai-whisper OR faster-whisper')
+            self.error.emit(
+                "Whisper not installed. Run: pip install openai-whisper OR faster-whisper"
+            )
             return
         try:
-            if HAS_WHISPER == 'faster':
-                model = WhisperModel(WHISPER_MODEL, device='cpu', compute_type='int8')
-                segments, _ = model.transcribe(self.wav_path, language='ar')
-                text = ' '.join(seg.text for seg in segments)
+            if HAS_WHISPER == "faster":
+                model = WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
+                segments, _ = model.transcribe(self.wav_path, language="ar")
+                text = " ".join(seg.text for seg in segments)
             else:
                 model = whisper.load_model(WHISPER_MODEL)
-                result = model.transcribe(self.wav_path, language='ar')
-                text = result.get('text', '')
+                result = model.transcribe(self.wav_path, language="ar")
+                text = result.get("text", "")
             self.transcribed.emit(text.strip())
         except Exception as e:
             self.error.emit(str(e))
@@ -82,11 +99,11 @@ class VoiceSTTWorker(QThread):
 
 def save_frames_to_wav(frames, rate=16000, channels=1, output_path=None):
     if output_path is None:
-        output_path = str(Path(tempfile.gettempdir()) / 'walid_voice.wav')
-    wf = wave.open(output_path, 'wb')
+        output_path = str(Path(tempfile.gettempdir()) / "walid_voice.wav")
+    wf = wave.open(output_path, "wb")
     wf.setnchannels(channels)
     wf.setsampwidth(2)
     wf.setframerate(rate)
-    wf.writeframes(b''.join(frames))
+    wf.writeframes(b"".join(frames))
     wf.close()
     return output_path

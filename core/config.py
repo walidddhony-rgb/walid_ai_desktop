@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+
 from core.paths import DATA_DIR
 
 DB_PATH = Path(os.getenv("WALID_DB_PATH", str(DATA_DIR / "walid_ai.db")))

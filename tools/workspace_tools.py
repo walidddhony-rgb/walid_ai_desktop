@@ -1,5 +1,6 @@
 import subprocess
 from pathlib import Path
+
 from PyQt6.QtCore import QThread, pyqtSignal
 
 
@@ -27,7 +28,7 @@ class WorkspaceCommandWorker(QThread):
     def run(self):
         try:
             cwd = Path(self.workspace_path)
-            self.log_message.emit(f'Executing in workspace: {self.command}')
+            self.log_message.emit(f"Executing in workspace: {self.command}")
             self.process = subprocess.Popen(
                 self.command,
                 cwd=str(cwd),
@@ -35,14 +36,14 @@ class WorkspaceCommandWorker(QThread):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                encoding='utf-8',
-                errors='ignore',
+                encoding="utf-8",
+                errors="ignore",
             )
             stdout, stderr = self.process.communicate()
             if self._cancel:
-                self.cancelled.emit('تم إلغاء تنفيذ الأمر داخل مساحة العمل.')
+                self.cancelled.emit("تم إلغاء تنفيذ الأمر داخل مساحة العمل.")
                 return
-            output = (stdout or '') + ('\\n' + stderr if stderr else '')
+            output = (stdout or "") + ("\\n" + stderr if stderr else "")
             self.finished_run.emit(self.process.returncode or 0, output.strip())
         except Exception as e:
             self.error.emit(str(e))

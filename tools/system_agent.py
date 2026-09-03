@@ -1,8 +1,9 @@
 """Static file system operations with path validation."""
+
 from __future__ import annotations
+
 import shutil
 from pathlib import Path
-from core.utils import sanitize_path
 
 
 class SystemAgent:

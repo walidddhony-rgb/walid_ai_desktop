@@ -1,5 +1,5 @@
-import json
 import requests
+
 from core.config import DEFAULT_MODEL, OLLAMA_URL
 
 
@@ -38,10 +38,12 @@ def compact_messages(messages: list, keep_recent: int = 4) -> list:
     summary = _generate_summary(to_summarize)
 
     compacted = system_msgs[:]
-    compacted.append({
-        "role": "system",
-        "content": f"ملخص المحادثة السابقة:\n{summary}\n\nهذه أحدث {keep_recent} رسائل:"
-    })
+    compacted.append(
+        {
+            "role": "system",
+            "content": f"ملخص المحادثة السابقة:\n{summary}\n\nهذه أحدث {keep_recent} رسائل:",
+        }
+    )
     compacted.extend(recent)
     return compacted
 

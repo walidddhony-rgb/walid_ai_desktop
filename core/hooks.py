@@ -1,7 +1,6 @@
 import importlib.util
 from pathlib import Path
 
-
 HOOK_EVENTS = [
     "PreToolUse",
     "PostToolUse",
@@ -58,7 +57,9 @@ def run_event_hooks(event, context, workspace_path):
     results = []
     for hook_path in hooks.get(event, []):
         result = run_hook(hook_path, context)
-        results.append({"path": hook_path, "approved": result["approved"], "message": result["message"]})
+        results.append(
+            {"path": hook_path, "approved": result["approved"], "message": result["message"]}
+        )
         context = result["modified_context"]
         if not result["approved"]:
             break
@@ -75,7 +76,7 @@ def create_hook_template(workspace_path, event, name="example"):
             '"""PreToolUse hook: runs before any tool execution.\n'
             'Return {"approved": False} to block the tool.\n'
             '"""\n'
-            'def main(context):\n'
+            "def main(context):\n"
             '    tool_name = context.get("tool_name", "")\n'
             '    tool_args = context.get("tool_args", {})\n'
             '    if tool_name == "exec" and tool_args.get("language") == "shell":\n'
@@ -87,7 +88,7 @@ def create_hook_template(workspace_path, event, name="example"):
     elif event == "PostToolUse":
         template = (
             '"""PostToolUse hook: runs after a tool completes."""\n'
-            'def main(context):\n'
+            "def main(context):\n"
             '    tool_name = context.get("tool_name", "")\n'
             '    tool_result = context.get("tool_result", "")\n'
             '    return {"approved": True}\n'
@@ -95,24 +96,16 @@ def create_hook_template(workspace_path, event, name="example"):
     elif event == "UserPromptSubmit":
         template = (
             '"""UserPromptSubmit hook: runs when user sends a message."""\n'
-            'def main(context):\n'
+            "def main(context):\n"
             '    user_message = context.get("user_message", "")\n'
             '    if "password" in user_message.lower() or "api key" in user_message.lower():\n'
             '        return {"approved": False, "message": "Warning: sensitive info detected"}\n'
             '    return {"approved": True}\n'
         )
     elif event == "SessionStart":
-        template = (
-            '"""SessionStart hook."""\n'
-            'def main(context):\n'
-            '    return {"approved": True}\n'
-        )
+        template = '"""SessionStart hook."""\ndef main(context):\n    return {"approved": True}\n'
     elif event == "SessionStop":
-        template = (
-            '"""SessionStop hook."""\n'
-            'def main(context):\n'
-            '    return {"approved": True}\n'
-        )
+        template = '"""SessionStop hook."""\ndef main(context):\n    return {"approved": True}\n'
     else:
         template = 'def main(context):\n    return {"approved": True}\n'
 

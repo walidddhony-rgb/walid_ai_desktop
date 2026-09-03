@@ -1,10 +1,7 @@
 """Smoke test: tool registry and file tools."""
-import os
-import tempfile
-from pathlib import Path
 
+from tools.file_tools import create_directory, create_file, list_directory, read_file
 from tools.registry import AGENT_TOOLS, execute_tool
-from tools.file_tools import create_file, read_file, list_directory, create_directory
 
 
 def test_agent_tools_count():

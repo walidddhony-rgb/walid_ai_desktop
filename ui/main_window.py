@@ -1,31 +1,50 @@
+import json
 from pathlib import Path
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import (QCheckBox, QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel, QListWidget, QMainWindow, QMessageBox, QPushButton, QProgressBar, QScrollArea, QSizePolicy, QSplitter, QTextEdit, QVBoxLayout, QWidget)
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QScrollArea,
+    QSizePolicy,
+    QSplitter,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
 from agent.worker import AgentWorker
-from core.config import SEARCH_MODES, load_config, save_config
-from core.code_executor import CodeExecutionWorker
 from core.agents_md import read_agents_md, write_agents_md
-from core.skills import discover_skills
-from core.session import save_session, list_sessions, load_session
-from core.profiles import list_profiles, load_profile, save_profile, ensure_default_profile
-from core.context_compaction import estimate_tokens
+from core.code_executor import CodeExecutionWorker
+from core.config import SEARCH_MODES, load_config, save_config
 from core.diff_review import DiffReviewDialog
+from core.hooks import HOOK_EVENTS, create_hook_template, discover_hooks
+from core.profiles import ensure_default_profile, list_profiles, load_profile
+from core.session import list_sessions, load_session, save_session
+from core.skills import discover_skills
 from core.subagent import SubagentManager
-from core.hooks import discover_hooks, create_hook_template, HOOK_EVENTS
 from db.database import Database
 from knowledge.index_worker import IndexWorker
 from knowledge.ingestor import preview_file_content
+from tools.file_tools import FileChangeBridge, set_bridge
 from ui.message_frame import MessageFrame
 from ui.themes import DARK_THEME, LIGHT_THEME
 from voice.stt_engine import VoiceRecorder, VoiceSTTWorker, save_frames_to_wav
 from voice.tts_engine import TTSSpeakWorker
-from tools.workspace_tools import WorkspaceCommandWorker
-from tools.file_tools import FileChangeBridge, set_bridge
-import json
 
 db = Database()
 ensure_default_profile()
+
 
 class InputTextEdit(QTextEdit):
     def __init__(self, cb):
@@ -33,11 +52,15 @@ class InputTextEdit(QTextEdit):
         self.callback = cb
         self.setPlaceholderText("اكتب... (Enter=إرسال, Shift+Enter=سطر جديد)")
         self.setFixedHeight(90)
+
     def keyPressEvent(self, e):
-        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not (e.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+        if e.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and not (
+            e.modifiers() & Qt.KeyboardModifier.ShiftModifier
+        ):
             self.callback()
             return
         super().keyPressEvent(e)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -167,7 +190,9 @@ class MainWindow(QMainWindow):
         center_layout.setContentsMargins(4, 4, 4, 4)
         self.chat = QScrollArea()
         self.chat.setWidgetResizable(True)
-        self.chat.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding))
+        self.chat.setSizePolicy(
+            QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        )
         self.chat_content = QWidget()
         self.chat_layout = QVBoxLayout(self.chat_content)
         self.chat_layout.addStretch()
@@ -386,7 +411,9 @@ class MainWindow(QMainWindow):
             self.log_task("مجلد: " + str(p))
 
     def execute_code_dialog(self):
-        lang, ok = QInputDialog.getItem(self, "كود", "اللغة:", ["python", "shell", "javascript"], 0, False)
+        lang, ok = QInputDialog.getItem(
+            self, "كود", "اللغة:", ["python", "shell", "javascript"], 0, False
+        )
         if not ok:
             return
         code, ok2 = QInputDialog.getMultiLineText(self, "كود", lang + ":")
@@ -394,8 +421,12 @@ class MainWindow(QMainWindow):
             self.run_code(lang, code.strip())
 
     def run_code(self, language, code):
-        self.code_worker = CodeExecutionWorker(code, language, str(self.workspace_path), self.auto_run)
-        self.code_worker.code_started.connect(lambda c, l: self.log_task("تنفيذ " + l))
+        self.code_worker = CodeExecutionWorker(
+            code, language, str(self.workspace_path), self.auto_run
+        )
+        self.code_worker.code_started.connect(
+            lambda c, language_name: self.log_task("تنفيذ " + language_name)
+        )
         self.code_worker.code_output.connect(self.log_task)
         self.code_worker.approval_needed.connect(self.on_approval_needed)
         self.code_worker.code_finished.connect(lambda rc, out: self.log_task("رمز: " + str(rc)))
@@ -417,7 +448,7 @@ class MainWindow(QMainWindow):
         p = Path(filepath)
         dialog = DiffReviewDialog(p.name, old_content, new_content, self)
         result = dialog.exec()
-        approved = (result == dialog.DialogCode.Accepted and dialog.approved)
+        approved = result == dialog.DialogCode.Accepted and dialog.approved
         if approved:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(new_content, encoding="utf-8")
@@ -445,7 +476,12 @@ class MainWindow(QMainWindow):
     def show_hooks(self):
         hooks = discover_hooks(str(self.workspace_path))
         if not hooks:
-            choice = QMessageBox.question(self, "خطافات", "لا توجد خطافات. إنشاء مثال؟", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            choice = QMessageBox.question(
+                self,
+                "خطافات",
+                "لا توجد خطافات. إنشاء مثال؟",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
             if choice == QMessageBox.StandardButton.Yes:
                 event, ok = QInputDialog.getItem(self, "حدث", "اختر:", HOOK_EVENTS, 0, False)
                 if ok and event:
@@ -488,7 +524,9 @@ class MainWindow(QMainWindow):
         results = self._subagent_mgr.get_all_results()
         active = self._subagent_mgr.active_count()
         status = "running" if active > 0 else "done"
-        return json.dumps({"status": status, "active": active, "results": results}, ensure_ascii=False)
+        return json.dumps(
+            {"status": status, "active": active, "results": results}, ensure_ascii=False
+        )
 
     def has_active_subagents(self):
         return self._subagent_mgr.active_count() > 0
@@ -517,14 +555,22 @@ class MainWindow(QMainWindow):
             self.log_task("لا توجد محادثة")
             return
         from db.database import Database as DB
+
         conn = DB()
-        rows = conn.conn.execute("SELECT role, content FROM messages WHERE conversation_id=? ORDER BY id", (self.cid,)).fetchall()
+        rows = conn.conn.execute(
+            "SELECT role, content FROM messages WHERE conversation_id=? ORDER BY id", (self.cid,)
+        ).fetchall()
         msgs = [{"role": r["role"], "content": r["content"]} for r in rows]
         path = save_session(self.cid, msgs, "محادثة")
         self.log_task("حفظ: " + path)
 
     def upload_files(self):
-        paths, _ = QFileDialog.getOpenFileNames(self, "ملفات", str(self.workspace_path), "All (*);;PDF (*.pdf);;Word (*.docx);;Text (*.txt *.md);;Python (*.py)")
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "ملفات",
+            str(self.workspace_path),
+            "All (*);;PDF (*.pdf);;Word (*.docx);;Text (*.txt *.md);;Python (*.py)",
+        )
         if not paths:
             return
         self.attached_files.extend(paths)
@@ -551,7 +597,9 @@ class MainWindow(QMainWindow):
         self.index_worker = IndexWorker(file_paths=self.attached_files)
         self.index_worker.progress_changed.connect(self.progress_bar.setValue)
         self.index_worker.log_message.connect(self.log_task)
-        self.index_worker.finished_indexing.connect(lambda n: (self.progress_bar.setValue(100), self.log_task("فهرسة: " + str(n) + " مقطع")))
+        self.index_worker.finished_indexing.connect(
+            lambda n: (self.progress_bar.setValue(100), self.log_task("فهرسة: " + str(n) + " مقطع"))
+        )
         self.index_worker.error.connect(lambda e: self.log_task("خطأ فهرسة: " + e))
         self.index_worker.start()
 
@@ -563,7 +611,9 @@ class MainWindow(QMainWindow):
         self.index_worker = IndexWorker(directory_path=d)
         self.index_worker.progress_changed.connect(self.progress_bar.setValue)
         self.index_worker.log_message.connect(self.log_task)
-        self.index_worker.finished_indexing.connect(lambda n: (self.progress_bar.setValue(100), self.log_task("فهرسة: " + str(n) + " مقطع")))
+        self.index_worker.finished_indexing.connect(
+            lambda n: (self.progress_bar.setValue(100), self.log_task("فهرسة: " + str(n) + " مقطع"))
+        )
         self.index_worker.error.connect(lambda e: self.log_task("خطأ: " + e))
         self.index_worker.start()
 
@@ -609,7 +659,9 @@ class MainWindow(QMainWindow):
         self.tts_btn.setEnabled(False)
         self.tts_worker = TTSSpeakWorker(self.current_assistant_text)
         self.tts_worker.error.connect(lambda e: self.log_task("TTS: " + e))
-        self.tts_worker.finished_speaking.connect(lambda: (self.tts_btn.setEnabled(True), self.log_task("انتهى النطق")))
+        self.tts_worker.finished_speaking.connect(
+            lambda: (self.tts_btn.setEnabled(True), self.log_task("انتهى النطق"))
+        )
         self.tts_worker.start()
 
     def _insert_chat_widget(self, widget):
@@ -644,13 +696,27 @@ class MainWindow(QMainWindow):
         memory = "\n".join(f"{k}: {v}" for k, v in db.get_all_memory().items())
         self._subagent_mgr.clear()
         self.set_working(True)
-        self.worker = AgentWorker(msg, self.selected_modes, memory, self.attached_files, self.cid, self.auto_learn, str(self.workspace_path), exec_callback=self.run_code_sync, spawn_callback=self.spawn_subagent, results_callback=self.get_subagent_results, wait_callback=self.has_active_subagents)
+        self.worker = AgentWorker(
+            msg,
+            self.selected_modes,
+            memory,
+            self.attached_files,
+            self.cid,
+            self.auto_learn,
+            str(self.workspace_path),
+            exec_callback=self.run_code_sync,
+            spawn_callback=self.spawn_subagent,
+            results_callback=self.get_subagent_results,
+            wait_callback=self.has_active_subagents,
+        )
         self.worker.chunk.connect(self.on_chunk)
         self.worker.tool_action.connect(self.on_tool_action)
         self.worker.code_execution.connect(self.on_code_from_agent)
         self.worker.step_started.connect(self.on_step_started)
         self.worker.compaction_triggered.connect(lambda info: self.log_task("📦 " + info))
-        self.worker.hook_triggered.connect(lambda ev, msg: self.log_task("🪝 " + ev + ": " + msg[:120]))
+        self.worker.hook_triggered.connect(
+            lambda ev, msg: self.log_task("🪝 " + ev + ": " + msg[:120])
+        )
         self.worker.subagent_waiting.connect(lambda msg: self.log_task("⏳ " + msg))
         self.worker.learned_fact.connect(lambda f: self.log_task("تعلّم: " + f[:80]))
         self.worker.finished_signal.connect(self.on_finished)
@@ -675,8 +741,13 @@ class MainWindow(QMainWindow):
             self.task_log.append(output)
 
     def run_code_sync(self, language, code):
-        import os as _os, subprocess as _sp, sys as _sys, tempfile as _tf
+        import os as _os
+        import subprocess as _sp
+        import sys as _sys
+        import tempfile as _tf
+
         from core.sandbox import is_dangerous
+
         if is_dangerous(code):
             return "rejected"
         tmp = Path(_tf.gettempdir()) / "walid_exec.py"
@@ -684,7 +755,16 @@ class MainWindow(QMainWindow):
         env = _os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
         env["PYTHONUTF8"] = "1"
-        r = _sp.run([_sys.executable, str(tmp)], cwd=str(self.workspace_path), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120, env=env)
+        r = _sp.run(
+            [_sys.executable, str(tmp)],
+            cwd=str(self.workspace_path),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+            env=env,
+        )
         return ((r.stdout or "") + ("\n" + r.stderr if r.stderr else "")).strip()[:1000]
 
     def on_code_from_agent(self, language, code):

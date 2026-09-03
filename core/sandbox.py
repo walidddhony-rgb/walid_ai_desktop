@@ -29,7 +29,17 @@ def is_dangerous(code: str) -> bool:
 def classify_action(code: str, language: str) -> str:
     if is_dangerous(code):
         return "dangerous"
-    destructive_keywords = ["rm ", "del ", "rmdir", "remove", "drop", "truncate", "overwrite", ">", "mv "]
+    destructive_keywords = [
+        "rm ",
+        "del ",
+        "rmdir",
+        "remove",
+        "drop",
+        "truncate",
+        "overwrite",
+        ">",
+        "mv ",
+    ]
     lower = code.lower()
     if any(kw in lower for kw in destructive_keywords):
         return "destructive"

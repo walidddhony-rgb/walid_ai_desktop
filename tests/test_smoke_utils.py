@@ -1,5 +1,6 @@
 """Smoke test: utility functions."""
-from core.utils import safe_filename, truncate, sanitize_path
+
+from core.utils import safe_filename, sanitize_path, truncate
 
 
 def test_safe_filename_normal():
@@ -26,6 +27,7 @@ def test_truncate_long():
 
 def test_sanitize_path():
     from pathlib import Path
+
     p = sanitize_path(".")
     assert isinstance(p, Path)
     assert p.is_absolute()

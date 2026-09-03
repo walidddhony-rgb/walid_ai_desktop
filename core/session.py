@@ -1,8 +1,7 @@
 import json
 from datetime import datetime
-from pathlib import Path
-from core.config import DATA_DIR
 
+from core.config import DATA_DIR
 
 SESSIONS_DIR = DATA_DIR / "sessions"
 SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
@@ -36,13 +35,15 @@ def list_sessions() -> list:
     for f in sorted(SESSIONS_DIR.glob("session_*.json"), reverse=True):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-            sessions.append({
-                "cid": data.get("cid", ""),
-                "title": data.get("title", ""),
-                "saved_at": data.get("saved_at", ""),
-                "path": str(f),
-                "message_count": len(data.get("messages", [])),
-            })
+            sessions.append(
+                {
+                    "cid": data.get("cid", ""),
+                    "title": data.get("title", ""),
+                    "saved_at": data.get("saved_at", ""),
+                    "path": str(f),
+                    "message_count": len(data.get("messages", [])),
+                }
+            )
         except Exception:
             pass
     return sessions

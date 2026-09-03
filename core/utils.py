@@ -1,10 +1,10 @@
-from pathlib import Path
 import re
 import uuid
+from pathlib import Path
 
 
 def safe_filename(name: str) -> str:
-    name = re.sub(r'[^\w\-\.\u0600-\u06FF ]+', '_', name).strip()
+    name = re.sub(r"[^\w\-\.\u0600-\u06FF ]+", "_", name).strip()
     return name or uuid.uuid4().hex
 
 

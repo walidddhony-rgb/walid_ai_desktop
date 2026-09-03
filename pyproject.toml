@@ -80,6 +80,9 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
+ignore = [
+    "E501", # Temporarily allow long agent prompts, templates, and UI strings.
+]
 
 [tool.mypy]
 python_version = "3.11"

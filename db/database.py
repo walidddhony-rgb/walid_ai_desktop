@@ -66,14 +66,18 @@ class Database:
         now = datetime.now().isoformat()
         ex = self.conn.execute("SELECT id FROM memory WHERE key=?", (key,)).fetchone()
         if ex:
-            self.conn.execute("UPDATE memory SET value=?,created_at=? WHERE id=?", (value, now, ex['id']))
+            self.conn.execute(
+                "UPDATE memory SET value=?,created_at=? WHERE id=?", (value, now, ex["id"])
+            )
         else:
-            self.conn.execute("INSERT INTO memory(key,value,created_at) VALUES(?,?,?)", (key, value, now))
+            self.conn.execute(
+                "INSERT INTO memory(key,value,created_at) VALUES(?,?,?)", (key, value, now)
+            )
         self.conn.commit()
 
     def get_all_memory(self):
         rows = self.conn.execute("SELECT key,value FROM memory ORDER BY id DESC").fetchall()
-        return {r['key']: r['value'] for r in rows}
+        return {r["key"]: r["value"] for r in rows}
 
     def add_knowledge_chunk(self, source_file, chunk_index, chunk_text, embedding=""):
         now = datetime.now().isoformat()
@@ -92,5 +96,7 @@ class Database:
         self.conn.commit()
 
     def get_learned_facts(self, limit=50):
-        rows = self.conn.execute("SELECT fact FROM learned_facts ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
-        return [r['fact'] for r in rows]
+        rows = self.conn.execute(
+            "SELECT fact FROM learned_facts ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [r["fact"] for r in rows]

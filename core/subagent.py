@@ -1,7 +1,7 @@
 import json
 import re
 import time
-import traceback
+
 import requests
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -32,7 +32,11 @@ def clean_result(text):
             continue
         if in_code:
             continue
-        if stripped.startswith("def ") or stripped.startswith("import ") or stripped.startswith("from "):
+        if (
+            stripped.startswith("def ")
+            or stripped.startswith("import ")
+            or stripped.startswith("from ")
+        ):
             continue
         if stripped.startswith("#"):
             continue
@@ -75,22 +79,30 @@ class SubagentWorker(QThread):
                 self.step_log.emit(self.agent_id, "step " + str(step))
 
                 if step >= 4:
-                    messages.append({
-                        "role": "user",
-                        "content": (
-                            "STOP calling tools. Give your FINAL ANSWER as plain text only. "
-                            "Write it in English or Arabic. "
-                            "NEVER write in Chinese. "
-                            "Do NOT include code blocks. "
-                            "Just state the result in 1-2 sentences."
-                        )
-                    })
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                "STOP calling tools. Give your FINAL ANSWER as plain text only. "
+                                "Write it in English or Arabic. "
+                                "NEVER write in Chinese. "
+                                "Do NOT include code blocks. "
+                                "Just state the result in 1-2 sentences."
+                            ),
+                        }
+                    )
 
                 try:
                     use_tools = AGENT_TOOLS if (self.mode == "worker" and step < 4) else []
                     response = requests.post(
                         OLLAMA_URL,
-                        json={"model": DEFAULT_MODEL, "messages": messages, "tools": use_tools, "stream": False, "options": {"num_ctx": 8192 if step < 4 else 4096}},
+                        json={
+                            "model": DEFAULT_MODEL,
+                            "messages": messages,
+                            "tools": use_tools,
+                            "stream": False,
+                            "options": {"num_ctx": 8192 if step < 4 else 4096},
+                        },
                         timeout=(10, SUBAGENT_TIMEOUT),
                     )
                     response.raise_for_status()
@@ -98,12 +110,20 @@ class SubagentWorker(QThread):
                     self.step_log.emit(self.agent_id, "timeout, retrying...")
                     retry_count += 1
                     if retry_count >= 2:
-                        self.result_ready.emit(self.agent_id, "Task failed after multiple timeouts.")
+                        self.result_ready.emit(
+                            self.agent_id, "Task failed after multiple timeouts."
+                        )
                         return
                     try:
                         response = requests.post(
                             OLLAMA_URL,
-                            json={"model": DEFAULT_MODEL, "messages": messages, "tools": [], "stream": False, "options": {"num_ctx": 4096}},
+                            json={
+                                "model": DEFAULT_MODEL,
+                                "messages": messages,
+                                "tools": [],
+                                "stream": False,
+                                "options": {"num_ctx": 4096},
+                            },
                             timeout=(10, SUBAGENT_TIMEOUT),
                         )
                         response.raise_for_status()
@@ -121,22 +141,29 @@ class SubagentWorker(QThread):
 
                 if content:
                     if has_chinese(content):
-                        self.step_log.emit(self.agent_id, "WARNING: Chinese detected, forcing retry without tools...")
+                        self.step_log.emit(
+                            self.agent_id,
+                            "WARNING: Chinese detected, forcing retry without tools...",
+                        )
                         messages.append({"role": "assistant", "content": content})
-                        messages.append({
-                            "role": "user",
-                            "content": (
-                                "Your previous response contained Chinese text which is NOT allowed. "
-                                "Rewrite your response in English or Arabic only. "
-                                "Do NOT use Chinese characters. "
-                                "Give a clean text answer without code blocks."
-                            )
-                        })
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    "Your previous response contained Chinese text which is NOT allowed. "
+                                    "Rewrite your response in English or Arabic only. "
+                                    "Do NOT use Chinese characters. "
+                                    "Give a clean text answer without code blocks."
+                                ),
+                            }
+                        )
                         continue
                     messages.append({"role": "assistant", "content": content})
 
                 if tool_calls and self.mode == "worker" and step < 4:
-                    messages.append({"role": "assistant", "content": content, "tool_calls": tool_calls})
+                    messages.append(
+                        {"role": "assistant", "content": content, "tool_calls": tool_calls}
+                    )
                     for tc in tool_calls:
                         if self._stop:
                             return
@@ -147,12 +174,18 @@ class SubagentWorker(QThread):
                         try:
                             result = execute_tool(name, args)
                             self.step_log.emit(self.agent_id, name + ": " + str(result)[:200])
-                            messages.append({"role": "tool", "name": name, "content": str(result)[:1000]})
+                            messages.append(
+                                {"role": "tool", "name": name, "content": str(result)[:1000]}
+                            )
                             last_error = None
                         except Exception as e:
                             last_error = str(e)
-                            self.step_log.emit(self.agent_id, "Error in " + name + ": " + str(e)[:200])
-                            messages.append({"role": "tool", "name": name, "content": "Error: " + str(e)[:500]})
+                            self.step_log.emit(
+                                self.agent_id, "Error in " + name + ": " + str(e)[:200]
+                            )
+                            messages.append(
+                                {"role": "tool", "name": name, "content": "Error: " + str(e)[:500]}
+                            )
                 else:
                     if content.strip():
                         final = clean_result(content)
@@ -213,7 +246,13 @@ class SubagentManager:
         self.counter += 1
         agent_id = "agent_" + str(self.counter)
         worker = SubagentWorker(agent_id, task, workspace_path, mode, max_steps)
-        self.agents[agent_id] = {"worker": worker, "task": task, "mode": mode, "result": None, "active": True}
+        self.agents[agent_id] = {
+            "worker": worker,
+            "task": task,
+            "mode": mode,
+            "result": None,
+            "active": True,
+        }
         return agent_id, worker
 
     def set_result(self, agent_id, result):
@@ -222,7 +261,10 @@ class SubagentManager:
             self.agents[agent_id]["active"] = False
 
     def get_all_results(self):
-        return {aid: {"task": i["task"], "mode": i["mode"], "result": i["result"]} for aid, i in self.agents.items()}
+        return {
+            aid: {"task": i["task"], "mode": i["mode"], "result": i["result"]}
+            for aid, i in self.agents.items()
+        }
 
     def active_count(self):
         return sum(1 for i in self.agents.values() if i["active"])

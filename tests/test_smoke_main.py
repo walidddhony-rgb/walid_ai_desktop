@@ -1,4 +1,5 @@
 """Smoke test: main module imports."""
+
 import importlib
 
 
