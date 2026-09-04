@@ -4,7 +4,7 @@ Message Display Widget - Enhanced chat message rendering with Markdown support.
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
-    QFrame, QTextEdit, QSizePolicy, QApplication, QToolTip, QAbstractItemView
+    QFrame, QTextEdit, QSizePolicy, QApplication, QToolTip
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
@@ -242,7 +242,6 @@ class MessageDisplay(QScrollArea):
         self.setWidgetResizable(True)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         
         self.container = QWidget()
         self.container_layout = QVBoxLayout()
